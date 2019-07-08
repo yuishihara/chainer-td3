@@ -48,7 +48,7 @@ class TD3(object):
         iterator = self._prepare_iterator(replay_buffer)
         for i in iterations:
             batch = iterator.next()
-            s_current, action, r, s_next, done = concat_examples(
+            s_current, action, r, s_next, non_terminal = concat_examples(
                 batch, device=self._device)
 
             epsilon = F.clip(self._sample_action_noise(),
@@ -58,7 +58,7 @@ class TD3(object):
             target_q1 = self._target_q1(s_next, a_tilde)
             target_q2 = self._target_q2(s_next, a_tilde)
 
-            y = r + gamma * done * F.min(target_q1, target_q2)
+            y = r + gamma * non_terminal * F.min(target_q1, target_q2)
             # Remove reference to avoid unexpected gradient update
             y.unchain()
 
