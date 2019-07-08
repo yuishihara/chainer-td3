@@ -4,10 +4,10 @@ import chainer.functions as F
 
 
 class TD3Actor(chainer.Chain):
-    def __init__(self, action_num):
+    def __init__(self, state_dim, action_num):
         super(TD3Actor, self).__init__()
         with self.init_scope():
-            self._linear1 = L.Linear(in_size=None, out_size=400)
+            self._linear1 = L.Linear(in_size=state_dim, out_size=400)
             self._linear2 = L.Linear(in_size=400, out_size=300)
             self._linear3 = L.Linear(in_size=300, out_size=action_num)
         self._action_num = action_num
