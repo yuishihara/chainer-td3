@@ -14,8 +14,9 @@ class TD3Critic(chainer.Chain):
         self._state_dim = state_dim
         self._action_num = action_num
 
-    def __call__(self, s):
-        h = self._linear1(s)
+    def __call__(self, s, a):
+        x = F.concat((s, a))
+        h = self._linear1(x)
         h = F.relu(h)
         h = self._linear2(h)
         h = F.relu(h)
