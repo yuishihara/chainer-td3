@@ -40,25 +40,40 @@ class TD3(object):
         self._action_noise = Normal(loc=mean, scale=sigma)
 
         self._device = device
-        self._clip_value = 0.5
 
-    def train(self, replay_buffer, iterations, d):
+    def train(self, replay_buffer, iterations, d, clip_value, gamma):
         iterator = self._prepare_iterator(replay_buffer)
         for i in iterations:
-            self._q1_optimizer.target.cleargrads()
-            self._q2_optimizer.target.cleargrads()
-            self._pi_optimizer.target.cleargrads()
-
             batch = iterator.next()
-            s_current, action, r, s_next = concat_examples(
+            s_current, action, r, s_next, done = concat_examples(
                 batch, device=self._device)
 
-            epsilon = F.clip(self._sample_action_noise(), -self._clip_value, self._clip_value)
+            epsilon = F.clip(self._sample_action_noise(),
+                             -clip_value, clip_value)
             a_tilde = self._pi(s_current) + epsilon
 
+            target_q1 = self._target_q1(s_next, a_tilde)
+            target_q2 = self._target_q2(s_next, a_tilde)
+
+            y = r + gamma * done * F.min(target_q1, target_q2)
+            # Remove reference to avoid unexpected gradient update
+            y.unchain()
+
+            q1 = self._q1(s_current, action)
+            q1_loss = F.mean_squared_error(y, q1)
+            q2 = self._q2(s_current, action)
+            q2_loss = F.mean_squared_error(y, q2)
+            critic_loss = q1_loss + q2_loss
+
+            self._q1_optimizer.target.cleargrads()
+            self._q2_optimizer.target.cleargrads()
+            critic_loss.backward()
+            critic_loss.unchain_backward()
+            self._q1_optimizer.update()
+            self._q2_optimizer.update()
+
             if i % d == 0:
-                # update targets and pi
-                pass
+                self._pi_optimizer.target.cleargrads()
 
     def _sample_action_noise(self):
         return self._action_noise.sample()
@@ -66,6 +81,7 @@ class TD3(object):
     def _prepare_iterator(self, buffer):
         dataset = tuple_dataset.TupleDataset(buffer)
         return iterators.SerialIterator(dataset, self._batch_size)
+
 
 if __name__ == "__main__":
     state_dim = 5
@@ -80,4 +96,4 @@ if __name__ == "__main__":
 
     print('mean: ', mean, ' sigma: ', np.sqrt(var))
 
-    assert noise.shape == (td3._batch_size, action_num) 
+    assert noise.shape == (td3._batch_size, action_num)
