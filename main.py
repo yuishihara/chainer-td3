@@ -17,6 +17,29 @@ def build_env(args):
     return gym.make(args.env)
 
 
+def save_params(td3, timestep, outdir, args):
+    print('saving model params of iter: ', timestep)
+
+    q1_filename = 'q1_iter-{}'.format(timestep)
+    q2_filename = 'q2_iter-{}'.format(timestep)
+    pi_filename = 'pi_iter-{}'.format(timestep)
+
+    td3._q1.to_cpu()
+    td3._q2.to_cpu()
+    td3._pi.to_cpu()
+    serializers.save_model(os.path.join(
+        outdir, q1_filename), td3._q1)
+    serializers.save_model(os.path.join(
+        outdir, q2_filename), td3._q2)
+    serializers.save_model(os.path.join(
+        outdir, pi_filename), td3._pi)
+
+    if not args.gpu < 0:
+        td3._q1.to_gpu()
+        td3._q2.to_gpu()
+        td3._pi.to_gpu()
+
+
 def run_training_loop(env, td3, args):
     replay_buffer = []
     s_current = env.reset()
@@ -46,10 +69,9 @@ def run_training_loop(env, td3, args):
         if done:
             td3.train(replay_buffer, episode_steps, args.d,
                       args.clip_value, args.gamma, args.tau)
-            episode_steps = 0
-            s_current = env.reset()
 
             if args.evaluation_interval < timestep - previous_evaluation:
+                print('evaluating policy at timestep: ', timestep)
                 rewards = td3.evaluate_policy(env)
                 mean = np.mean(rewards)
                 median = np.median(rewards)
@@ -59,28 +81,11 @@ def run_training_loop(env, td3, args):
                 with open(result_file, "a") as f:
                     f.write('{timestep}\t{mean}\t{median}\n'.format(
                         timestep=timestep, mean=mean, median=median))
-
-                print('saving model params of iter: ', timestep)
-
-                q1_filename = 'q1_iter-{}'.format(timestep)
-                q2_filename = 'q2_iter-{}'.format(timestep)
-                pi_filename = 'pi_iter-{}'.format(timestep)
-
-                td3._q1.to_cpu()
-                td3._q2.to_cpu()
-                td3._pi.to_cpu()
-                serializers.save_model(os.path.join(
-                    outdir, q1_filename), td3._q1)
-                serializers.save_model(os.path.join(
-                    outdir, q2_filename), td3._q2)
-                serializers.save_model(os.path.join(
-                    outdir, pi_filename), td3._pi)
-
-                if not args.gpu < 0:
-                    td3._q1.to_gpu()
-                    td3._q2.to_gpu()
-                    td3._pi.to_gpu()
-
+                
+                save_params(td3, timestep, outdir, args)
+                previous_evaluation = timestep
+            
+            episode_steps = 0
             s_current = env.reset()
 
 
