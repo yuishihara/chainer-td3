@@ -29,6 +29,14 @@ class TD3(object):
         self._target_q2 = TD3Critic(state_dim=state_dim, action_num=action_num)
         self._target_pi = TD3Actor(state_dim=state_dim, action_num=action_num)
 
+        if not device < 0:
+            self._q1.to_gpu()
+            self._q2.to_gpu()
+            self._pi.to_gpu()
+            self._target_q1.to_gpu()
+            self._target_q2.to_gpu()
+            self._target_pi.to_gpu()
+
         self._q1_optimizer.setup(self._q1)
         self._q2_optimizer.setup(self._q2)
         self._pi_optimizer.setup(self._pi)
@@ -36,11 +44,28 @@ class TD3(object):
         xp = np if device < 0 else cp
 
         mean = xp.zeros(shape=(batch_size, action_num), dtype=xp.float32)
-        sigma = xp.ones(shape=(batch_size, action_num), dtype=np.float32) * 0.2
-        self._action_noise = Normal(loc=mean, scale=sigma)
+        sigma = xp.ones(shape=(batch_size, action_num), dtype=np.float32)
+        self._exploration_noise = Normal(loc=mean, scale=sigma * 0.1)
+        self._action_noise = Normal(loc=mean, scale=sigma * 0.2)
 
         self._device = device
         self._initialized = False
+
+    def act_with_policy(self, env, s):
+        noise = self._sample_exploration_noise()
+
+        a = self._pi(s) + noise
+        a.to_cpu()
+        s_next, r, done, _ = env.step(a.array)
+        return s, a, r, s_next, done
+
+    def act_randomly(self, env, s):
+        a = env.action_space.sample()
+        s_next, r, done, _ = env.step(a)
+        return s, a, r, s_next, done
+
+    def evaluate_policy(self, env):
+        pass
 
     def train(self, replay_buffer, iterations, d, clip_value, gamma, tau):
         if not self._initialized:
@@ -103,6 +128,9 @@ class TD3(object):
 
     def _sample_action_noise(self):
         return self._action_noise.sample()
+
+    def _sample_exploration_noise(self):
+        return self._exploration_noise.sample()
 
     def _prepare_iterator(self, buffer):
         dataset = tuple_dataset.TupleDataset(buffer)
