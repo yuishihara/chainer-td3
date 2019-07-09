@@ -3,6 +3,12 @@ import gym
 import argparse
 
 import collections
+import os
+
+import numpy as np
+
+from researchutils import files
+from researchutils.chainer import serializers
 
 from td3 import TD3
 
@@ -17,6 +23,13 @@ def run_training_loop(env, td3, args):
 
     episode_steps = 0
     previous_evaluation = 0
+
+    outdir = files.prepare_output_dir(base_dir=args.outdir, args=args)
+
+    result_file = os.path.join(outdir, 'result.txt')
+    if not files.file_exists(result_file):
+        with open(result_file, "w") as f:
+            f.write('timestep\tmean\tmedian\n')
 
     for timestep in args.total_timesteps:
         if timestep < args.start_timesteps:
@@ -38,10 +51,37 @@ def run_training_loop(env, td3, args):
 
             if args.evaluation_interval < timestep - previous_evaluation:
                 rewards = td3.evaluate_policy(env)
+                mean = np.mean(rewards)
+                median = np.median(rewards)
+
+                print('mean: {mean}, median: {median}'.format(
+                    mean=mean, median=median))
+                with open(result_file, "a") as f:
+                    f.write('{timestep}\t{mean}\t{median}\n'.format(
+                        timestep=timestep, mean=mean, median=median))
+
+                print('saving model params of iter: ', timestep)
+
+                q1_filename = 'q1_iter-{}'.format(timestep)
+                q2_filename = 'q2_iter-{}'.format(timestep)
+                pi_filename = 'pi_iter-{}'.format(timestep)
+
+                td3._q1.to_cpu()
+                td3._q2.to_cpu()
+                td3._pi.to_cpu()
+                serializers.save_model(os.path.join(
+                    outdir, q1_filename), td3._q1)
+                serializers.save_model(os.path.join(
+                    outdir, q2_filename), td3._q2)
+                serializers.save_model(os.path.join(
+                    outdir, pi_filename), td3._pi)
+
+                if not args.gpu < 0:
+                    td3._q1.to_gpu()
+                    td3._q2.to_gpu()
+                    td3._pi.to_gpu()
 
             s_current = env.reset()
-        
-
 
 
 def start_training(args):
@@ -58,6 +98,9 @@ def start_training(args):
 
 def main():
     parser = argparse.ArgumentParser()
+
+    # output
+    parser.add_argument('--outdir', type=str, default='results')
 
     # Environment
     parser.add_argument('--env', type=str, default='Walker2d-v1')

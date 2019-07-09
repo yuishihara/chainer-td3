@@ -65,7 +65,19 @@ class TD3(object):
         return s, a, r, s_next, done
 
     def evaluate_policy(self, env):
-        pass
+        s = env.reset()
+        rewards = []
+        episode_reward = 0
+        for _ in range(10):
+            a = self._pi(s)
+            a.to_cpu()
+            s, r, done, _ = env.step(a.array)
+            episode_reward += r
+            if done:
+                rewards.append(episode_reward)
+                episode_reward = 0
+                s = env.reset()
+        return rewards
 
     def train(self, replay_buffer, iterations, d, clip_value, gamma, tau):
         if not self._initialized:
