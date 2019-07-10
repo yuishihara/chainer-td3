@@ -108,7 +108,7 @@ def main():
     parser.add_argument('--outdir', type=str, default='results')
 
     # Environment
-    parser.add_argument('--env', type=str, default='Walker2d-v1')
+    parser.add_argument('--env', type=str, default='Walker2d-v2')
 
     # Gpu
     parser.add_argument('--gpu', type=int, default=-1)
