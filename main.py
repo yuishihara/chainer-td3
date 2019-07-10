@@ -54,7 +54,7 @@ def run_training_loop(env, td3, args):
         with open(result_file, "w") as f:
             f.write('timestep\tmean\tmedian\n')
 
-    for timestep in args.total_timesteps:
+    for timestep in range(args.total_timesteps):
         if timestep < args.start_timesteps:
             s_current, a, r, s_next, done = td3.act_with_policy(env, s_current)
         else:
