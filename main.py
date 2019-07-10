@@ -126,6 +126,8 @@ def main():
 
     args = parser.parse_args()
 
+    start_training(args)
+
 
 if __name__ == "__main__":
     main()
