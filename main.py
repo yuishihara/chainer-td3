@@ -73,6 +73,7 @@ def run_training_loop(env, td3, args):
             if args.evaluation_interval < timestep - previous_evaluation:
                 print('evaluating policy at timestep: ', timestep)
                 rewards = td3.evaluate_policy(env)
+                print('rewards: ', rewards)
                 mean = np.mean(rewards)
                 median = np.median(rewards)
 

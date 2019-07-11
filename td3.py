@@ -87,25 +87,25 @@ class TD3(object):
         return s, a, r, s_next, done
 
     def evaluate_policy(self, env):
-        s = env.reset()
         rewards = []
-        episode_reward = 0
         for _ in range(10):
-            s = np.float32(s)
-            s = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
-            if not self._device < 0:
-                s.to_gpu()
+            s = env.reset()
+            episode_reward = 0
+            while True:
+                s = np.float32(s)
+                s = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
+                if not self._device < 0:
+                    s.to_gpu()
 
-            a = self._pi(s)
-            if not self._device < 0:
-                a.to_cpu()
-            a = np.squeeze(a.data, axis=0)
-            s, r, done, _ = env.step(a)
-            episode_reward += r
-            if done:
-                rewards.append(episode_reward)
-                episode_reward = 0
-                s = env.reset()
+                a = self._pi(s)
+                if not self._device < 0:
+                    a.to_cpu()
+                a = np.squeeze(a.data, axis=0)
+                s, r, done, _ = env.step(a)
+                episode_reward += r
+                if done:
+                    rewards.append(episode_reward)
+                    break
         return rewards
 
     def train(self, replay_buffer, iterations, d, clip_value, gamma, tau):
@@ -127,7 +127,8 @@ class TD3(object):
             target_q2 = self._target_q2(s_next, a_tilde)
 
             r = F.reshape(r, shape=(*r.shape, 1))
-            non_terminal = F.reshape(non_terminal, shape=(*non_terminal.shape, 1))
+            non_terminal = F.reshape(
+                non_terminal, shape=(*non_terminal.shape, 1))
             min_q = F.minimum(target_q1, target_q2)
             # print('r shape: ', r.shape)
             # print('done shape: ', non_terminal.shape)
