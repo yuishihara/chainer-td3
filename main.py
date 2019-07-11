@@ -56,9 +56,9 @@ def run_training_loop(env, td3, args):
 
     for timestep in range(args.total_timesteps):
         if timestep < args.start_timesteps:
-            s_current, a, r, s_next, done = td3.act_with_policy(env, s_current)
-        else:
             s_current, a, r, s_next, done = td3.act_randomly(env, s_current)
+        else:
+            s_current, a, r, s_next, done = td3.act_with_policy(env, s_current)
         non_terminal = np.float32(0 if done else 1)
 
         replay_buffer.append((s_current, a, r, s_next, non_terminal))
