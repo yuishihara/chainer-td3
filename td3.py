@@ -11,6 +11,8 @@ from collections import deque
 from models.td3_actor import TD3Actor
 from models.td3_critic import TD3Critic
 
+import gym
+
 import numpy as np
 # import cupy as cp
 
@@ -26,6 +28,7 @@ class TD3(object):
         self._q1 = TD3Critic(state_dim=state_dim, action_num=action_num)
         self._q2 = TD3Critic(state_dim=state_dim, action_num=action_num)
         self._pi = TD3Actor(state_dim=state_dim, action_num=action_num)
+
         self._target_q1 = TD3Critic(state_dim=state_dim, action_num=action_num)
         self._target_q2 = TD3Critic(state_dim=state_dim, action_num=action_num)
         self._target_pi = TD3Actor(state_dim=state_dim, action_num=action_num)
@@ -86,12 +89,18 @@ class TD3(object):
         r = np.float32(r)
         return s, a, r, s_next, done
 
-    def evaluate_policy(self, env):
+    def evaluate_policy(self, env, render=False, save_video=False):
+        if save_video:
+            env = gym.wrappers.Monitor(env, directory='video',
+                                       write_upon_reset=True, force=True, resume=True, mode='evaluation')
+
         rewards = []
         for _ in range(10):
             s = env.reset()
             episode_reward = 0
             while True:
+                if render:
+                    env.render()
                 s = np.float32(s)
                 s = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
                 if not self._device < 0:

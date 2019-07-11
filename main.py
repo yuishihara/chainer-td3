@@ -17,6 +17,21 @@ def build_env(args):
     return gym.make(args.env)
 
 
+def load_params(td3, args):
+    print('loading model params')
+
+    td3._q1.to_cpu()
+    td3._q2.to_cpu()
+    td3._pi.to_cpu()
+    serializers.load_model(args.q1_params, td3._q1)
+    serializers.load_model(args.q2_params, td3._q2)
+    serializers.load_model(args.pi_params, td3._pi)
+    if not args.gpu < 0:
+        td3._q1.to_gpu()
+        td3._q2.to_gpu()
+        td3._pi.to_gpu()
+
+
 def save_params(td3, timestep, outdir, args):
     print('saving model params of iter: ', timestep)
 
@@ -82,10 +97,10 @@ def run_training_loop(env, td3, args):
                 with open(result_file, "a") as f:
                     f.write('{timestep}\t{mean}\t{median}\n'.format(
                         timestep=timestep, mean=mean, median=median))
-                
+
                 save_params(td3, timestep, outdir, args)
                 previous_evaluation = timestep
-            
+
             episode_steps = 0
             s_current = env.reset()
 
@@ -98,9 +113,31 @@ def start_training(args):
               lr=args.learning_rate,
               batch_size=args.batch_size,
               device=args.gpu)
+    load_params(td3, args)
 
     run_training_loop(env, td3, args)
 
+    env.close()
+
+def start_test_run(args):
+    env = build_env(args)
+
+    td3 = TD3(state_dim=env.observation_space.shape[0],
+              action_num=env.action_space.shape[0],
+              lr=args.learning_rate,
+              batch_size=args.batch_size,
+              device=args.gpu)
+    load_params(td3, args)
+
+    rewards = td3.evaluate_policy(env, render=True, save_video=args.save_video)
+    print('rewards: ', rewards)
+    mean = np.mean(rewards)
+    median = np.median(rewards)
+
+    print('mean: {mean}, median: {median}'.format(
+        mean=mean, median=median))
+
+    env.close()
 
 def main():
     parser = argparse.ArgumentParser()
@@ -113,6 +150,15 @@ def main():
 
     # Gpu
     parser.add_argument('--gpu', type=int, default=-1)
+
+    # testing
+    parser.add_argument('--test-run', action='store_true')
+    parser.add_argument('--save-video', action='store_true')
+
+    # params
+    parser.add_argument('--q1-params', type=str, default=None)
+    parser.add_argument('--q2-params', type=str, default=None)
+    parser.add_argument('--pi-params', type=str, default=None)
 
     # Training parameters
     parser.add_argument('--total-timesteps', type=float, default=1000000)
@@ -127,7 +173,10 @@ def main():
 
     args = parser.parse_args()
 
-    start_training(args)
+    if args.test_run:
+        start_test_run(args)
+    else:
+        start_training(args)
 
 
 if __name__ == "__main__":
