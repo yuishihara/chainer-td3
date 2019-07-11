@@ -1,9 +1,10 @@
+import chainer
+import chainer.functions as F
 from chainer import optimizers
 from chainer import iterators
 from chainer.datasets import tuple_dataset
 from chainer.dataset import concat_examples
 from chainer.distributions import Normal
-import chainer.functions as F
 
 from collections import deque
 
@@ -43,20 +44,29 @@ class TD3(object):
 
         xp = np if device < 0 else cp
 
-        mean = xp.zeros(shape=(batch_size, action_num), dtype=xp.float32)
-        sigma = xp.ones(shape=(batch_size, action_num), dtype=np.float32)
+        mean = xp.zeros(shape=(action_num), dtype=xp.float32)
+        sigma = xp.ones(shape=(action_num), dtype=np.float32)
         self._exploration_noise = Normal(loc=mean, scale=sigma * 0.1)
         self._action_noise = Normal(loc=mean, scale=sigma * 0.2)
 
         self._device = device
         self._initialized = False
 
-    def act_with_policy(self, env, s):
-        noise = self._sample_exploration_noise()
+        self._action_num = action_num
 
-        a = self._pi(s) + noise
-        a.to_cpu()
-        s_next, r, done, _ = env.step(a.array)
+    def act_with_policy(self, env, s):
+        state = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
+        if not self._device < 0:
+            state.to_gpu()
+
+        a = self._pi(state)
+        if not self._device < 0:
+            a.to_cpu()
+        a = np.squeeze(a.data, axis=0)
+
+        noise = self._sample_exploration_noise(shape=(1))
+        assert a.shape == noise.shape
+        s_next, r, done, _ = env.step(a + noise)
         return s, a, r, s_next, done
 
     def act_randomly(self, env, s):
@@ -69,9 +79,15 @@ class TD3(object):
         rewards = []
         episode_reward = 0
         for _ in range(10):
+            s = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
+            if not self._device < 0:
+                s.to_gpu()
+
             a = self._pi(s)
-            a.to_cpu()
-            s, r, done, _ = env.step(a.array)
+            if not self._device < 0:
+                a.to_cpu()
+            a = np.squeeze(a.data, axis=0)
+            s, r, done, _ = env.step(a)
             episode_reward += r
             if done:
                 rewards.append(episode_reward)
@@ -88,9 +104,11 @@ class TD3(object):
             s_current, action, r, s_next, non_terminal = concat_examples(
                 batch, device=self._device)
 
-            epsilon = F.clip(self._sample_action_noise(),
+            epsilon = F.clip(self._sample_action_noise(shape=(self._batch_size)),
                              -clip_value, clip_value)
-            a_tilde = self._target_pi(s_current) + epsilon
+            target_pi = self._target_pi(s_current)
+            assert target_pi.shape == epsilon.shape
+            a_tilde = target_pi + epsilon
 
             target_q1 = self._target_q1(s_next, a_tilde)
             target_q2 = self._target_q2(s_next, a_tilde)
@@ -138,11 +156,11 @@ class TD3(object):
             target_param.data = tau * origin_param.data + \
                 (1.0 - tau) * target_param.data
 
-    def _sample_action_noise(self):
-        return self._action_noise.sample()
+    def _sample_action_noise(self, shape):
+        return self._action_noise.sample(shape)
 
-    def _sample_exploration_noise(self):
-        return self._exploration_noise.sample()
+    def _sample_exploration_noise(self, shape):
+        return self._exploration_noise.sample(shape)
 
     def _prepare_iterator(self, buffer):
         dataset = tuple_dataset.TupleDataset(buffer)
@@ -152,17 +170,23 @@ class TD3(object):
 if __name__ == "__main__":
     state_dim = 5
     action_num = 5
-    td3 = TD3(state_dim=state_dim, action_num=action_num, batch_size=100)
+    batch_size = 100
+    td3 = TD3(state_dim=state_dim, action_num=action_num,
+              batch_size=batch_size)
 
-    noise = td3._sample_action_noise()
-    print('noise shape: ', noise.shape, ' noise: ', noise)
-
-    mean = np.mean(noise.array)
-    var = np.var(noise.array)
-
+    a_noise = td3._sample_action_noise(shape=(batch_size))
+    print('action noise shape: ', a_noise.shape, ' noise: ', a_noise)
+    mean = np.mean(a_noise.array)
+    var = np.var(a_noise.array)
     print('mean: ', mean, ' sigma: ', np.sqrt(var))
+    assert a_noise.shape == (td3._batch_size, action_num)
 
-    assert noise.shape == (td3._batch_size, action_num)
+    e_noise = td3._sample_action_noise(shape=(1))
+    print('exploration noise shape: ', e_noise.shape, ' noise: ', e_noise)
+    mean = np.mean(e_noise.array)
+    var = np.var(e_noise.array)
+    print('mean: ', mean, ' sigma: ', np.sqrt(var))
+    assert a_noise.shape == (1, action_num)
 
     for target_param, origin_param in zip(td3._target_pi.params(), td3._pi.params()):
         print('before target param shape: ', target_param.shape,
