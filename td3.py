@@ -111,7 +111,7 @@ class TD3(object):
         if not self._initialized:
             self._initialize_target_networks()
         iterator = self._prepare_iterator(replay_buffer)
-        for i in iterations:
+        for i in range(iterations):
             batch = iterator.next()
             s_current, action, r, s_next, non_terminal = concat_examples(
                 batch, device=self._device)
