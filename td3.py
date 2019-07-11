@@ -55,6 +55,7 @@ class TD3(object):
         self._action_num = action_num
 
     def act_with_policy(self, env, s):
+        s = np.float32(s)
         state = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
         if not self._device < 0:
             state.to_gpu()
@@ -67,11 +68,21 @@ class TD3(object):
         noise = self._sample_exploration_noise(shape=(1))
         assert a.shape == noise.shape
         s_next, r, done, _ = env.step(a + noise)
+
+        s_next = np.float32(s_next)
+        a = np.float32(a)
+        r = np.float32(r)
         return s, a, r, s_next, done
 
     def act_randomly(self, env, s):
+        s = np.float32(s)
+
         a = env.action_space.sample()
         s_next, r, done, _ = env.step(a)
+
+        s_next = np.float32(s_next)
+        a = np.float32(a)
+        r = np.float32(r)
         return s, a, r, s_next, done
 
     def evaluate_policy(self, env):
