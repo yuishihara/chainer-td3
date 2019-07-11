@@ -156,9 +156,9 @@ def main():
     parser.add_argument('--save-video', action='store_true')
 
     # params
-    parser.add_argument('--q1-params', type=str, default=None)
-    parser.add_argument('--q2-params', type=str, default=None)
-    parser.add_argument('--pi-params', type=str, default=None)
+    parser.add_argument('--q1-params', type=str, default="")
+    parser.add_argument('--q2-params', type=str, default="")
+    parser.add_argument('--pi-params', type=str, default="")
 
     # Training parameters
     parser.add_argument('--total-timesteps', type=float, default=1000000)
