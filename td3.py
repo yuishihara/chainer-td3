@@ -63,11 +63,12 @@ class TD3(object):
         a = self._pi(state)
         if not self._device < 0:
             a.to_cpu()
-        a = np.squeeze(a.data, axis=0)
-
         noise = self._sample_exploration_noise(shape=(1))
+        # print('a shape:', a.shape, ' noise shape: ', noise.shape)
         assert a.shape == noise.shape
-        s_next, r, done, _ = env.step(a + noise)
+
+        a = np.squeeze((a + noise).data, axis=0)
+        s_next, r, done, _ = env.step(a)
 
         s_next = np.float32(s_next)
         a = np.float32(a)
