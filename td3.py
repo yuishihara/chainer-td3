@@ -91,6 +91,7 @@ class TD3(object):
         rewards = []
         episode_reward = 0
         for _ in range(10):
+            s = np.float32(s)
             s = chainer.Variable(np.reshape(s, newshape=(1, ) + s.shape))
             if not self._device < 0:
                 s.to_gpu()
@@ -125,7 +126,15 @@ class TD3(object):
             target_q1 = self._target_q1(s_next, a_tilde)
             target_q2 = self._target_q2(s_next, a_tilde)
 
-            y = r + gamma * non_terminal * F.min(target_q1, target_q2)
+            r = F.reshape(r, shape=(*r.shape, 1))
+            non_terminal = F.reshape(non_terminal, shape=(*non_terminal.shape, 1))
+            min_q = F.minimum(target_q1, target_q2)
+            # print('r shape: ', r.shape)
+            # print('done shape: ', non_terminal.shape)
+            # print('min q shape: ', min_q.shape)
+
+            y = r + gamma * non_terminal * min_q
+            # print('y shape: ', y.shape)
             # Remove reference to avoid unexpected gradient update
             y.unchain()
 
@@ -175,8 +184,7 @@ class TD3(object):
         return self._exploration_noise.sample(shape)
 
     def _prepare_iterator(self, buffer):
-        dataset = tuple_dataset.TupleDataset(buffer)
-        return iterators.SerialIterator(dataset, self._batch_size)
+        return iterators.SerialIterator(buffer, self._batch_size)
 
 
 if __name__ == "__main__":
