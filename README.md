@@ -5,6 +5,14 @@ Reproduction codes of Twin Delayed Deep Deterministic policy gradient (TD3) with
 
 This repo is a TD3 reproduction codes writen with chainer. [See this original paper](http://proceedings.mlr.press/v80/fujimoto18a/fujimoto18a.pdf) for details
 
+# How to train
+
+Will be trained with CPU by default
+
+```sh
+$ python3 main.py --env="walker2d-v2"
+```
+
 # Results
 
 May require to export below variable before running the code in linux environment. 
