@@ -108,3 +108,9 @@ venv.bak/
 
 # results
 results/**
+
+# mujoco
+MUJOCO_LOG.TXT
+
+# video
+video/**

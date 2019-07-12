@@ -91,8 +91,10 @@ class TD3(object):
 
     def evaluate_policy(self, env, render=False, save_video=False):
         if save_video:
+            from OpenGL import GL
             env = gym.wrappers.Monitor(env, directory='video',
                                        write_upon_reset=True, force=True, resume=True, mode='evaluation')
+            render=False
 
         rewards = []
         for _ in range(10):
